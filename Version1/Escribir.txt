@@ -1,0 +1,16 @@
+Node, x, y:
+A,5,10
+B,15,20
+C,10,5
+D,3,7
+E,5,6
+F,20,-2
+G,12,4
+H,0,20
+I,18,12
+Segment, Origin, Destination:
+S1,A,B
+S2,B,F
+S3,C,A
+S4,A,E
+S5,A,I
