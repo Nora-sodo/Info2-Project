@@ -1,13 +1,12 @@
+from node import *
 from segment import *
+from path import *
 import matplotlib.pyplot as plt
-
 
 class Graph:
     def __init__(self):
         self.nodes = []         #Llista de nodes
         self.segments = []      #Llista de segments
-
-ejesGrafico = [-5,25,-5,25]
 
 def AddNode(g, n): # Afegeix un node a un Graph g
     if n in g.nodes: # Mira que el node no estigui ja al Graph g
@@ -15,6 +14,11 @@ def AddNode(g, n): # Afegeix un node a un Graph g
     else:
         g.nodes.append(n)
         return True
+def FindNodeName(g, name): # Troba a un Graph el node amb el nom indicat
+    for n in g.nodes:
+        if n.name == name:
+            return n
+    return None
 
 def AddSegment(g, segmentName, nameOriginNode, nameDestinationNode): # Afegeix un segment a un Graph g
     foundOrigin = False
@@ -37,6 +41,10 @@ def AddSegment(g, segmentName, nameOriginNode, nameDestinationNode): # Afegeix u
     else: # Si no ha trobat els dos retornara False
         return False
 
+def AddDobleSegment(g, segmentName, n1, n2): # Afegeix un segment en doble direccio
+    AddSegment(g, segmentName, n1, n2)
+    AddSegment(g, segmentName, n2, n1)
+
 def GetClosest(g, x, y): # Troba el node que pertany al Graph g mes proper al punt:(x,y)
     point = Node("Point",x,y) # Node que marca el punt
     closest = g.nodes[0]
@@ -47,9 +55,9 @@ def GetClosest(g, x, y): # Troba el node que pertany al Graph g mes proper al pu
             closest = n
     return closest
 
-def CreateNiceArrows(segment, segment_color, out_color, in_color, headArrow_l, headArrow_w):  # Crea fletxes amb el cap centrat
+def CreateNiceArrows(segment, segment_color, out_color, in_color, headArrow_l, headArrow_w, l_width):  # Crea fletxes amb el cap centrat
     # Dibuixa el segment
-    plt.plot([segment.origin_n.x, segment.dest_n.x], [segment.origin_n.y, segment.dest_n.y], color = segment_color,zorder = 0)
+    plt.plot([segment.origin_n.x, segment.dest_n.x], [segment.origin_n.y, segment.dest_n.y], color = segment_color, linewidth = l_width, zorder = 0)
 
     # Increment de x i de y
     dx = segment.dest_n.x - segment.origin_n.x
@@ -79,13 +87,12 @@ def Plot(g):
         plt.text(n.x + 0.5, n.y + 0.5, n.name, color='green', weight='bold', fontsize=6)
     # Dibuixa segments i mostra el que mesuren
     for s in g.segments:
-        CreateNiceArrows(s, 'blue', 'blue', 'blue', 0.6, 0.4)
+        CreateNiceArrows(s, 'blue', 'blue', 'blue', 0.6, 0.4, 1.5)
         MidTextSegment(s, round(s.cost, 2), 'black')
 
-    plt.axis(ejesGrafico) # Estableix limits eixos
+    plt.tight_layout()
     plt.grid(color='red', linestyle='dashed', linewidth=0.5) # Dibuixa una graella pel fons
-    plt.title('Gráfico con nodos y segmentos') # Fica titol
-    plt.show() # Mostra grafic
+    plt.title('Nodes and Segments Graph',font="Arial",size=10) # Fica titol
 
 def PlotNode (g, nameOrigin):
     node = next(n for n in g.nodes if n.name == nameOrigin) # Primer node que compleixi que el seu nom es igual a nameOrigin
@@ -101,17 +108,17 @@ def PlotNode (g, nameOrigin):
                 # Crea fletxa per unir el node amb el vei
                 s = Segment('Unión vecina' + str(i), node, n)
                 i += 1
-                CreateNiceArrows(s,'red','red','red',0.6,0.4)
+                CreateNiceArrows(s,'red','red','red',0.6,0.4, 1.5)
                 MidTextSegment(s, round(s.cost, 2), 'black')
             else:
                 plt.plot(n.x, n.y, 'o', color='grey', markersize=5) # Pinta els nodes no veins de gris
             # Escriu el nom del node
             plt.text(n.x + 0.5, n.y + 0.5, n.name, color='green', weight='bold', fontsize=6)
 
-        plt.axis(ejesGrafico)  # Estableix limits eixos
+        plt.tight_layout()
         plt.grid(color='red', linestyle='dashed', linewidth=0.5)  # Dibuixa una graella pel fons
-        plt.title('Gráfico con nodos y segmentos')  # Fica titol
-        plt.show()  # Mostra grafic
+        plt.title('Nodes and Segments Graph',font="Arial",size=10)  # Fica titol
+        #plt.show()  # Mostra grafic
         return True
 
 def GraphFile(filename):
@@ -157,3 +164,58 @@ def GraphFile(filename):
             origin_node.neighbors.append(dest_node)
 
     return g # Retorna el Graph
+
+def FindShortestPath (g, n_orig, n_dest):
+    orig = FindNodeName(g, n_orig)
+    dest = FindNodeName(g, n_dest)
+
+    shortest_path = Path()
+    short_paths = [Path()]
+    AddNodeToPath(short_paths[0], orig)
+    short_paths[0].cost = Distance(orig, dest)
+    actual_n = orig
+
+    cost_shortest = 0 # Guarda la distancia mes curta
+    index_shortest = 1 # Guarda l'index del mes petit de cada ronda
+    path_index = 0 # Guarda el cami que es bifurcara
+    j = 1  # Comptador de possibles camins
+
+    while actual_n != dest:
+        for n in actual_n.neighbors:
+            short_paths.append(Path())
+            for past_n in short_paths[path_index].nodes: # Afegir nodes veins al cami
+                short_paths[j].nodes.append(past_n)
+            short_paths[j].nodes.append(n)
+
+            k = 0 # Comptador per sumar camins
+            while k < len(short_paths[j].nodes)-1: # Sumatori de cost de camins
+                short_paths[j].cost += Distance(short_paths[j].nodes[k], short_paths[j].nodes[k+1])
+                k += 1
+
+            short_paths[j].cost += Distance(short_paths[j].nodes[k], dest)
+            cost_shortest = short_paths[1].cost
+            if short_paths[j].cost < cost_shortest:
+                index_shortest = j
+                cost_shortest = short_paths[j].cost
+            j += 1
+        del short_paths[path_index]
+        j -= 1
+
+        i = 0
+        while i < len(short_paths):
+            if short_paths[i].cost <= cost_shortest:
+                actual_n = short_paths[i].nodes[-1]
+                cost_shortest = short_paths[i].cost
+                path_index = i
+                if dest == short_paths[i].nodes[-1]:
+                    shortest_path = short_paths[i]
+            i += 1
+
+    for n in shortest_path.nodes:
+        print(n.name)
+    return shortest_path
+
+
+# Returns a Path describing the shortest path between origin
+# and destination. Returns None if there is no path
+# connecting these nodes.
