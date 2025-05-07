@@ -8,12 +8,16 @@ class Graph:
         self.nodes = []         #Llista de nodes
         self.segments = []      #Llista de segments
 
+##################
+# FUNCIONS GRAPH #
+##################
 def AddNode(g, n): # Afegeix un node a un Graph g
     if n in g.nodes: # Mira que el node no estigui ja al Graph g
         return False
     else:
         g.nodes.append(n)
         return True
+
 def FindNodeName(g, name): # Troba a un Graph el node amb el nom indicat
     for n in g.nodes:
         if n.name == name:
@@ -55,46 +59,32 @@ def GetClosest(g, x, y): # Troba el node que pertany al Graph g mes proper al pu
             closest = n
     return closest
 
-def CreateNiceArrows(segment, segment_color, out_color, in_color, headArrow_l, headArrow_w, l_width):  # Crea fletxes amb el cap centrat
-    # Dibuixa el segment
-    plt.plot([segment.origin_n.x, segment.dest_n.x], [segment.origin_n.y, segment.dest_n.y], color = segment_color, linewidth = l_width, zorder = 0)
-
-    # Increment de x i de y
-    dx = segment.dest_n.x - segment.origin_n.x
-    dy = segment.dest_n.y - segment.origin_n.y
-
-    # Normalizar la direccio per ajustar la longitud de la fletxa
-    norm = (dx ** 2 + dy ** 2) ** 0.5  # Magnitud del vector
-    unit_dx = dx / norm  # Direccio normalizada en x
-    unit_dy = dy / norm  # Direccio normalizada en y
-
-    # Dibuixa la fletxa
-    plt.arrow(segment.origin_n.x,segment.origin_n.y,dx-headArrow_l*unit_dx,dy-headArrow_l*unit_dy,head_width = headArrow_w, head_length = headArrow_l, fc = in_color, ec = out_color)
-
-def MidTextSegment(segment, text, text_color): # Fica un text centrat en un segment
-    # Centre del segment
-    mid_x = (segment.origin_n.x + segment.dest_n.x) / 2
-    mid_y = (segment.origin_n.y + segment.dest_n.y) / 2
-
-    # Escriu text
-    plt.text(mid_x, mid_y, text, fontsize=8, color=text_color, weight='bold', ha='center')
-
-def Plot(g):
+def Plot(g, active_n, color, size, show_all, ax, fig):
     # Dibuixa els nodes
     for n in g.nodes:
-        plt.plot(n.x, n.y, 'o', color='red', markersize=5)
+        if n == active_n:
+            ax.plot(n.x, n.y, 'o', color='darkblue', markersize=size*8)
+        else:
+            ax.plot(n.x, n.y, 'o', color='red', markersize=size*5)
+
         # Escriu el nom dels nodes a dalt a la dreta
-        plt.text(n.x + 0.5, n.y + 0.5, n.name, color='green', weight='bold', fontsize=6)
+        if show_all:
+            ax.text(n.x + size * 0.5, n.y + size * 0.5, n.name, color='green', weight='bold', fontsize=size * 8)
+        else:
+            ax.text(n.x + size * 0.1, n.y + size * 0.1, n.name, color='black', weight='bold', fontsize=size * 17)
+
     # Dibuixa segments i mostra el que mesuren
     for s in g.segments:
-        CreateNiceArrows(s, 'blue', 'blue', 'blue', 0.6, 0.4, 1.5)
-        MidTextSegment(s, round(s.cost, 2), 'black')
+        if show_all:
+            CreateNiceArrows(s, color, color, size * 0.5, size * 0.2, size * 1.5, ax)
+            MidTextSegment(s, round(s.cost, 2), 'black', size, ax)
+        else:
+            CreateNiceArrows(s, color, color, size * 0.2, size * 0.1, size * 1.5, ax)
 
-    plt.tight_layout()
-    plt.grid(color='red', linestyle='dashed', linewidth=0.5) # Dibuixa una graella pel fons
-    plt.title('Nodes and Segments Graph',font="Arial",size=10) # Fica titol
+    fig.subplots_adjust(left=0.15, right=0.95, top=0.95, bottom=0.15)
+    ax.grid(color='red', linestyle='dashed', linewidth=size*0.5) # Dibuixa una graella pel fons
 
-def PlotNode (g, nameOrigin):
+def PlotNode (g, nameOrigin, size, show_all, ax, fig):
     node = next(n for n in g.nodes if n.name == nameOrigin) # Primer node que compleixi que el seu nom es igual a nameOrigin
     i = 1 # Comptador
     if node == None: # Si no s'ha trobat cap node la funcio acaba
@@ -102,23 +92,28 @@ def PlotNode (g, nameOrigin):
     else: # Si s'ha trobat creara un segment entre els nodes veins del node i el node, a mes de dibuixar tots els nodes del Graph g
         for n in g.nodes:
             if n == node:
-                plt.plot(n.x, n.y, 'o', color='blue', markersize=5) # Pinta el node principal de blau
+                ax.plot(n.x, n.y, 'o', color='blue', markersize=size*5) # Pinta el node principal de blau
             elif n in node.neighbors:
-                plt.plot(n.x, n.y, 'o', color='green', markersize=5) # Pinta els nodes veins de verd
+                ax.plot(n.x, n.y, 'o', color='green', markersize=size*5) # Pinta els nodes veins de verd
                 # Crea fletxa per unir el node amb el vei
                 s = Segment('Unión vecina' + str(i), node, n)
                 i += 1
-                CreateNiceArrows(s,'red','red','red',0.6,0.4, 1.5)
-                MidTextSegment(s, round(s.cost, 2), 'black')
+                if show_all:
+                    CreateNiceArrows(s, 'red', 'red', size * 0.5, size * 0.2, size * 1.5, ax)
+                    MidTextSegment(s, round(s.cost, 2), 'black', size, ax)
+                else:
+                    CreateNiceArrows(s, 'red', 'red', size * 0.2, size * 0.1, size * 1.5, ax)
             else:
-                plt.plot(n.x, n.y, 'o', color='grey', markersize=5) # Pinta els nodes no veins de gris
+                ax.plot(n.x, n.y, 'o', color='grey', markersize=size*5) # Pinta els nodes no veins de gris
             # Escriu el nom del node
-            plt.text(n.x + 0.5, n.y + 0.5, n.name, color='green', weight='bold', fontsize=6)
+            if show_all:
+                ax.text(n.x + size*0.5, n.y + size*0.5, n.name, color='green', weight='bold', fontsize=size*8)
+            else:
+                ax.text(n.x + size * 0.1, n.y + size * 0.1, n.name, color='black', weight='bold', fontsize=size*17)
 
-        plt.tight_layout()
-        plt.grid(color='red', linestyle='dashed', linewidth=0.5)  # Dibuixa una graella pel fons
-        plt.title('Nodes and Segments Graph',font="Arial",size=10)  # Fica titol
-        #plt.show()  # Mostra grafic
+        fig.subplots_adjust(left=0.15, right=0.95, top=0.95, bottom=0.15)
+        ax.grid(color='blue', linestyle='dashed', linewidth=size*0.5)  # Dibuixa una graella pel fons
+
         return True
 
 def GraphFile(filename):
@@ -129,6 +124,7 @@ def GraphFile(filename):
     reading_nodes = True # Variable que determinara si esta llegint els nodes (True) o els segments (False)
     for line in lines:
         line = line.strip() # Elimina espais inicials
+
         # Mira en quin cas es troba: linia buida, node o segment
         if not line:
             continue
@@ -154,12 +150,15 @@ def GraphFile(filename):
             seg_name = parts[0]
             origin_name = parts[1]
             dest_name = parts[2]
+
             # Busca quin node te de nom el esmentat en el fitxer (tant d'origen com de desti)
             origin_node = next(n for n in g.nodes if n.name == origin_name)
             dest_node = next(n for n in g.nodes if n.name == dest_name)
+
             # Crea segment i l'afegeix a g
             segment = Segment(seg_name, origin_node, dest_node)
             g.segments.append(segment)
+
             # Afegeix el node desti com a vei del node origen
             origin_node.neighbors.append(dest_node)
 
@@ -176,7 +175,6 @@ def FindShortestPath (g, n_orig, n_dest):
     actual_n = orig
 
     cost_shortest = 0 # Guarda la distancia mes curta
-    index_shortest = 1 # Guarda l'index del mes petit de cada ronda
     path_index = 0 # Guarda el cami que es bifurcara
     j = 1  # Comptador de possibles camins
 
@@ -195,7 +193,6 @@ def FindShortestPath (g, n_orig, n_dest):
             short_paths[j].cost += Distance(short_paths[j].nodes[k], dest)
             cost_shortest = short_paths[1].cost
             if short_paths[j].cost < cost_shortest:
-                index_shortest = j
                 cost_shortest = short_paths[j].cost
             j += 1
         del short_paths[path_index]
@@ -215,7 +212,24 @@ def FindShortestPath (g, n_orig, n_dest):
         print(n.name)
     return shortest_path
 
+#####################
+# FUNCIONS PER PLOT #
+#####################
+def CreateNiceArrows(segment, segment_color, head_color, headArrow_l, headArrow_w, l_width, ax):  # Crea fletxes amb el cap centrat
+    # Dibuixa el segment
+    ax.plot([segment.origin_n.x, segment.dest_n.x], [segment.origin_n.y, segment.dest_n.y], color = segment_color, linewidth = l_width, zorder = 0)
 
-# Returns a Path describing the shortest path between origin
-# and destination. Returns None if there is no path
-# connecting these nodes.
+    # Increment de x i de y
+    dx = segment.dest_n.x - segment.origin_n.x
+    dy = segment.dest_n.y - segment.origin_n.y
+
+    # Dibuixa la fletxa
+    ax.arrow(segment.origin_n.x, segment.origin_n.y, dx, dy, length_includes_head = True, head_length = headArrow_l, head_width = headArrow_w, color = head_color)
+
+def MidTextSegment(segment, text, text_color, size, ax): # Fica un text centrat en un segment
+    # Centre del segment
+    mid_x = (segment.origin_n.x + segment.dest_n.x) / 2
+    mid_y = (segment.origin_n.y + segment.dest_n.y) / 2
+
+    # Escriu text
+    ax.text(mid_x, mid_y, text, fontsize=size*10, color=text_color, weight='bold', ha='center')

@@ -1,32 +1,101 @@
 import tkinter as tk
+from tkinter import filedialog
 from PIL import Image, ImageTk
 from graph import *
 from AirSpace import *
 
 #####################
+# VARIABLES GLOBALS #
+#####################
+# Dades sobre el que esta actiu
+fig, ax = plt.subplots()
+windowGraph = Graph()
+activeNode = Node('',0,0)
+
+indexNode = 0
+catSelect = False
+
+# Tamanys dels components del grafic
+st_size = 1
+sm_size = 0.3
+
+# Variables per saber ratoli en grafic
+x_limits = 0
+y_limits = 0
+image_size_x = int(960)
+image_size_y = int(image_size_x*3/4)
+# MARGENES: left 15%, right 5%, top 5%, bottom 15%
+xl_margin = image_size_x * 0.15
+yu_margin = image_size_y * 0.05
+xr_margin = image_size_x * 0.05
+yd_margin = image_size_y * 0.15
+
+#####################
 # FUNCIONS PROPIES: #
 #####################
+# Per sempre que canvi el grafic, mira si esta enfonsat el boto de node map
+def SeeSunkenOn_NoNew():
+    global ax
+    fig.clf()
+    ax = fig.add_subplot(111)
+    if not nButton.cget('relief') == 'sunken':
+        if catSelect:
+            Plot(windowGraph, activeNode, 'blue', sm_size, False, ax, fig)
+        else:
+            Plot(windowGraph, activeNode, 'blue', st_size, True, ax, fig)
+    else:
+        if catSelect:
+            PlotNode(windowGraph, nodeSelect.get(), sm_size, False, ax, fig)
+        else:
+            PlotNode(windowGraph, nodeSelect.get(), st_size, True, ax, fig)
+
+# Per sempre que es crei grafic de zero, mira si esta enfonsat el boto de node map
+def SeeSunkenOn_AllNew():
+    global activeNode, ax
+    fig.clf()
+    ax = fig.add_subplot(111)
+    if nButton.cget('relief') == 'sunken':
+        if catSelect:
+            PlotNode(windowGraph, nodeSelect.get(), sm_size, False, ax, fig)
+        else:
+            PlotNode(windowGraph, nodeSelect.get(), st_size, True, ax, fig)
+    else:
+        indexNode = 0
+        activeNode = windowGraph.nodes[indexNode]
+        if catSelect:
+            Plot(windowGraph, activeNode, 'blue', sm_size, False, ax, fig)
+        else:
+            Plot(windowGraph, activeNode, 'blue', st_size, True, ax, fig)
+
 # Canvia la imatge grafico.png al grafic que toca
 def GraphChange():
-    imagenGrafico = Image.open("grafico.png")  # Reemplaza con tu nueva imagen
-    nuevaImagen = imagenGrafico.resize((500, 400))
+    global x_limits, y_limits, image_size_x, image_size_y, fig
+    # Actualitzem limits
+    x_limits = ax.get_xlim()
+    y_limits = ax.get_ylim()
 
-    # Convertir la imagen a un formato compatible con Tkinter
+    # Fiquem nova imatge, la escalem i la fiquem en format TKinter
+    imagenGrafico = Image.open("grafico.png")
+    nuevaImagen = imagenGrafico.resize((image_size_x, image_size_y), Image.Resampling.LANCZOS)
     nueva_imagen_tk = ImageTk.PhotoImage(nuevaImagen)
 
-    # Actualizar la imagen del Label
+    # Actualitzem imatge
     label_imagen.config(image=nueva_imagen_tk)
     label_imagen.image = nueva_imagen_tk
 
-windowGraph = Graph()
-
 # Passa de Airspace a Graph
 def AirspaceToGraph(g, a):
+    origin = ''
+    destination = ''
     for n in a.nav_points:
         AddNode(g, Node(n.name,n.lon,n.lat))
     for s in a.nav_segments:
-        AddSegment(g, "Segment", FindNodeName(g, s.o_number), FindNodeName(g, s.d_number))
-        print(FindNodeName(g, s.o_number).name, FindNodeName(g, s.d_number).name)
+        for navPoint in a.nav_points:
+            if navPoint.number == s.o_number:
+                origin = navPoint.name
+            elif navPoint.number == s.d_number:
+                destination = navPoint.name
+        AddSegment(g, "Segment", origin, destination)
 
 ######################################################################################################
 
@@ -128,150 +197,261 @@ def CreateCatGraph():
 ###########################################################################################################
 
 
-
-# Crear finestra principal
-root = tk.Tk()
-root.title("Graph")
-root.geometry("800x800")
-
-# Crear una etiqueta
-title = tk.Label(root, text="Main options:", font=("Arial", 10, "bold"))
-title.pack(pady=10)  # Empaqueta el widget con espacio vertical
-
-
-
-####################
-# FUNCIONS BOTONS: #
-####################
+#############################
+# FUNCIONS BOTONS O EVENTS: #
+#############################
 # Funcio per quan exampleButton pressionat
 def ExampleButtonClick():
-    global windowGraph
+    global windowGraph, activeNode, catSelect
+    catSelect = False
     windowGraph = CreateGraph_1()
-    if nButton.cget('relief') == 'sunken':
-        PlotNode(windowGraph, nodeSelect.get())
-    else:
-        Plot(windowGraph)
-    plt.savefig("grafico.png")
+    SeeSunkenOn_AllNew()
+    fig.savefig("grafico.png")
     plt.show()
     GraphChange()
 
 # Funcio per quan inventedButton pressionat
 def InventedButtonClick():
-    global windowGraph
+    fig.clf()
+    fig.savefig('grafico.png')
+    plt.close(fig)
+    global windowGraph, activeNode, catSelect
+    catSelect = False
     windowGraph = CreateGraph_2()
-    if nButton.cget('relief') == 'sunken':
-        PlotNode(windowGraph, nodeSelect.get())
-    else:
-        Plot(windowGraph)
-    plt.savefig("grafico.png")
+    SeeSunkenOn_AllNew()
+    fig.savefig("grafico.png")
     plt.show()
     GraphChange()
 
 # Funcio per quan catButton pressionat
 def CatButtonClick():
-    global windowGraph
+    global windowGraph, activeNode, catSelect
+    catSelect = True
     windowGraph = CreateCatGraph()
-    if nButton.cget('relief') == 'sunken':
-        PlotNode(windowGraph, nodeSelect.get())
-    else:
-        Plot(windowGraph)
-    plt.savefig("grafico.png")
+    SeeSunkenOn_AllNew()
+    fig.savefig('grafico.png')
     plt.show()
     GraphChange()
 
 # Funcio per quan loadButton pressionat
 def LoadButtonClick():
-    global windowGraph
-    windowGraph = GraphFile(fileName.get())
-    if nButton.cget('relief') == 'sunken':
-        PlotNode(windowGraph, nodeSelect.get())
-    else:
-        Plot(windowGraph)
-    plt.savefig("grafico.png")
+    global windowGraph, activeNode, catSelect
+    catSelect = False
+    # Obrir per seleccionar arxiu
+    file_path = filedialog.askopenfilename(title = "Select a file",filetypes = [("Text files", "*.txt"), ("All files", "*.*")])
+    windowGraph = GraphFile(file_path)
+    SeeSunkenOn_AllNew()
+    fig.savefig('grafico.png')
     plt.show()
     GraphChange()
 
 # Funcio per quan nButton pressionat
-def NButtonClick():
-    if PlotNode(windowGraph,nodeSelect.get()):
-        if nButton.cget('relief') == 'sunken':
-            # Si está presionado, lo dejamos normal
-            Plot(windowGraph)
-            nButton.config(relief="raised", bg="lightblue",text="Node Graph: OFF")
-
+def NPlotButtonClick():
+    if nButton.cget('relief') == 'sunken':
+        # Si está presionado, lo dejamos normal
+        if catSelect:
+            Plot(windowGraph, activeNode, 'blue', sm_size, False, ax, fig)
         else:
-            # Si está normal, lo dejamos presionado
-            PlotNode(windowGraph, nodeSelect.get())
-            nButton.config(relief="sunken", bg="gray64",text="Node Graph: ON")
-        plt.savefig("grafico.png")
-        plt.show()
-        GraphChange()
+            Plot(windowGraph, activeNode, 'blue', st_size, True, ax, fig)
+        nButton.config(relief="raised", bg="lightblue",text="Node Graph: OFF")
 
+    else:
+        # Si está normal, lo dejamos presionado
+        if nodeSelect.get() == '' or FindNodeName(windowGraph, nodeSelect.get()) == None:
+            if catSelect:
+                Plot(windowGraph, activeNode, 'blue', sm_size, False, ax, fig)
+            else:
+                Plot(windowGraph, activeNode, 'blue', st_size, True, ax, fig)
+        else:
+            if catSelect:
+                PlotNode(windowGraph, nodeSelect.get(), sm_size, False, ax, fig)
+            else:
+                PlotNode(windowGraph, nodeSelect.get(), st_size, True, ax, fig)
+        nButton.config(relief="sunken", bg="gray64",text="Node Graph: ON")
+    fig.savefig("grafico.png")
+    plt.show()
+    GraphChange()
+
+# Boto per afegir node
 def AddNButtonClick():
     node = Node(nameSelect_n.get(),float(xSelect_n.get()),float(ySelect_n.get()))
     AddNode(windowGraph, node)
-    if not nButton.cget('relief') == 'sunken':
-        Plot(windowGraph)
-    else:
-        PlotNode(windowGraph, nodeSelect.get())
-    plt.savefig("grafico.png")
+    SeeSunkenOn_NoNew()
+    fig.savefig("grafico.png")
     plt.show()
     GraphChange()
 
+# Boto per afegir segment
 def AddSButtonClick():
     AddSegment(windowGraph, nameSelect_s.get(), xSelect_s.get(), ySelect_s.get())
-    if not nButton.cget('relief') == 'sunken':
-        Plot(windowGraph)
+    SeeSunkenOn_NoNew()
+    fig.savefig("grafico.png")
+    plt.show()
+    GraphChange()
+
+# Boto per trobar cami mes curt
+def ShortPathButtonClick():
+    if catSelect:
+        Plot(windowGraph, activeNode, 'lightgray', sm_size, False, ax, fig)
+        PlotPath(FindShortestPath(windowGraph, xSelect_p.get(), ySelect_p.get()), sm_size, False, fig)
     else:
-        PlotNode(windowGraph, nodeSelect.get())
-    plt.savefig("grafico.png")
+        Plot(windowGraph, activeNode, 'lightgray', st_size, True, ax, fig)
+        PlotPath(FindShortestPath(windowGraph, xSelect_p.get(), ySelect_p.get()), st_size, True, fig)
+
+    fig.savefig("grafico.png")
     plt.show()
     GraphChange()
 
-def AddPButtonClick():
-    Plot(windowGraph)
-    PlotPath(windowGraph, FindShortestPath(windowGraph,xSelect_p.get(),ySelect_p.get()))
-    plt.savefig("grafico.png")
+# Funcio que fara que aparegui en pantalla una pantalla per preguntar el nom del node
+def NameNodeWindow(x,y):
+    # Crear finestra emergent
+    text_window = tk.Toplevel(root)
+
+    # Etiqueta
+    label = tk.Label(text_window, text="Node name:")
+    label.pack(padx=10, pady=10)
+
+    # Camp de texto (Entry)
+    entry = tk.Entry(text_window, width=30)
+    entry.pack(padx=10, pady=10)
+
+    # Función para obtener el texto cuando se presiona un botón
+    def get_text():
+        AddNode(windowGraph, Node(entry.get(), x, y))
+        SeeSunkenOn_NoNew()
+        fig.savefig('grafico.png')
+        plt.show()
+        GraphChange()
+        text_window.destroy()  # Cerrar la ventana emergente
+
+    # Botón para confirmar el ingreso del texto
+    submit_button = tk.Button(text_window, text="Confirm", command=get_text)
+    submit_button.pack(padx=10, pady=10)
+
+# Detecta les fletxes, per canviar node actiu
+def KeyEvent(event):
+    global activeNode, indexNode, ax
+    fig.clf()
+    ax = fig.add_subplot(111)
+    tecla = event.keysym
+    if tecla == "Left":
+        if indexNode == 0:
+            indexNode = len(windowGraph.nodes) - 1
+        else:
+            indexNode -= 1
+    elif tecla == "Right":
+        if indexNode == len(windowGraph.nodes) - 1:
+            indexNode = 0
+        else:
+            indexNode += 1
+    activeNode = windowGraph.nodes[indexNode]
+
+    # Actualitzar pantalla
+
+    if nButton.cget('relief') == 'sunken':
+        if nodeSelect.get() == '' or FindNodeName(windowGraph, nodeSelect.get()) == None:
+            if catSelect:
+                PlotNode(windowGraph, activeNode.name, sm_size, False, ax, fig)
+            else:
+                PlotNode(windowGraph, activeNode.name, st_size, True, ax, fig)
+        else:
+            if catSelect:
+                PlotNode(windowGraph, nodeSelect.get(), sm_size, False, ax, fig)
+            else:
+                PlotNode(windowGraph, nodeSelect.get(), st_size, True, ax, fig)
+                PlotNode(windowGraph, nodeSelect.get(), st_size, True, ax, fig)
+    else:
+        if catSelect:
+            Plot(windowGraph, activeNode,'blue', sm_size, False, ax, fig)
+        else:
+            Plot(windowGraph, activeNode,'blue', st_size, True, ax, fig)
+    fig.savefig('grafico.png')
     plt.show()
     GraphChange()
 
+# Funcio executada quan es clica al grafic
+def ImageClicked(event):
+    global activeNode, x_limits, y_limits
+    # Obtener las coordenadas del clic dentro del label
+    conversion_x = (x_limits[1]-x_limits[0])/(image_size_x-xr_margin-xl_margin)
+    conversion_y = (y_limits[1]-y_limits[0])/(image_size_y-yu_margin-yd_margin)
+
+    hitbox_x = 0.25
+    hitbox_y = 0.25
+
+    x_grafic = x_limits[0] + (event.x - xl_margin)*conversion_x
+    y_grafic = y_limits[1] - (event.y - yu_margin) * conversion_y
+    hay_punto = False
+
+    if x_grafic > x_limits[0] and x_grafic < x_limits[1] and y_grafic > y_limits[0] and y_grafic < y_limits[1]: # Per saber si es troba entre els limits
+        for n in windowGraph.nodes:
+            if n.x > x_grafic-hitbox_x and n.x < x_grafic+hitbox_x and n.y > y_grafic-hitbox_y and n.y < y_grafic+hitbox_y:
+                activeNode = n
+                hay_punto = True
+                break
+        if not hay_punto:
+            NameNodeWindow(x_grafic,y_grafic)
+
+        SeeSunkenOn_NoNew()
+        fig.savefig('grafico.png')
+        plt.show()
+        GraphChange()
 
 
-#####################################
-# CREACIO BOTONS, ETIQUETES, ETC... #
-#####################################
+##################################################################################################################
+
+
+####################
+# CREACIO FINESTRA #
+####################
+# Crear finestra principal
+root = tk.Tk()
+root.title("Graph")
+root.state('zoomed')
+root.configure(bg = "#ffffff")
+root.bind("<Left>", KeyEvent)
+root.bind("<Right>", KeyEvent)
+root.focus_set()
+
+# Agrupacio de tot
+allFrame = tk.Frame(root)
+allFrame.configure(bg = "#ffffff")
+allFrame.pack(pady=20)
+
+# Agrupacio botons
+buttonFrame = tk.Frame(allFrame)
+buttonFrame.configure(bg = "#ffffff")
+buttonFrame.pack(side="left", pady=20)
+
+# Crear una etiqueta
+title = tk.Label(buttonFrame, text="Graph options:", font=("Arial", 10, "bold"))
+title.pack(pady=10)  # Empaqueta el widget con espacio vertical
+title.config(bg = "#ffffff")
+
 #Creacio fila per escollir el grafic
-graphFrame = tk.Frame(root)
+graphFrame = tk.Frame(buttonFrame)
 graphFrame.pack(pady=10)
 exampleButton = tk.Button(graphFrame, bg="lightblue", text="Example Graph", command=ExampleButtonClick)
 inventedButton = tk.Button(graphFrame, bg="lightblue", text="Invented Graph", command=InventedButtonClick)
 cataloniaButton = tk.Button(graphFrame, bg="lightblue", text="Catalonia Graph", command=CatButtonClick)
+loadButton = tk.Button(graphFrame, bg="lightblue", text="Load File", command=LoadButtonClick)
 exampleButton.pack(side="left", padx=5)
 inventedButton.pack(side="left", padx=5)
 cataloniaButton.pack(side="left", padx=5)
-
-# Escollir filepath
-loadFrame = tk.Frame(root)
-loadFrame.pack(pady=10)
-infLabel1 = tk.Label(loadFrame, text="File path:", font=("Arial", 7, "bold"))
-loadButton = tk.Button(loadFrame, bg="lightblue", text="Load File", command=LoadButtonClick)
-fileName = tk.Entry(loadFrame, width=30)
-infLabel1.pack(side="left", padx=3)
-fileName.pack(side="left", padx=3)
-loadButton.pack(side="left", padx=3)
+loadButton.pack(side="left", padx=5)
 
 # Mode node
-nFrame = tk.Frame(root)
+nFrame = tk.Frame(buttonFrame)
 nFrame.pack(pady=10)
 infLabel2 = tk.Label(nFrame, text="Node name:", font=("Arial", 7, "bold"))
-nButton = tk.Button(nFrame, bg="lightblue", text="Node Graph: OFF", command=NButtonClick)
+nButton = tk.Button(nFrame, bg="lightblue", text="Node Graph: OFF", command=NPlotButtonClick)
 nodeSelect = tk.Entry(nFrame, width=10)
 infLabel2.pack(side="left", padx=3)
 nodeSelect.pack(side="left", padx=5)
 nButton.pack(side="left", padx=5)
 
 #Creacio fila per crear node
-nodeFrame = tk.Frame(root)
+nodeFrame = tk.Frame(buttonFrame)
 nodeFrame.pack(pady=10)
 infNameLabel_n = tk.Label(nodeFrame, text="Node name:", font=("Arial", 7, "bold"))
 nameSelect_n = tk.Entry(nodeFrame, width=10)
@@ -289,7 +469,7 @@ ySelect_n.pack(side="left", padx=4)
 nodeButton.pack(side="left", padx=5)
 
 #Creacio fila per crear segment
-sFrame = tk.Frame(root)
+sFrame = tk.Frame(buttonFrame)
 sFrame.pack(pady=10)
 infNameLabel_s = tk.Label(sFrame, text="Segment name:", font=("Arial", 7, "bold"))
 nameSelect_s = tk.Entry(sFrame, width=10)
@@ -306,14 +486,14 @@ infYLabel_s.pack(side="left", padx=2)
 ySelect_s.pack(side="left", padx=4)
 sButton.pack(side="left", padx=5)
 
-#Creacio fila per crear cami
-pFrame = tk.Frame(root)
+#Creacio fila per trobar cami mes curt
+pFrame = tk.Frame(buttonFrame)
 pFrame.pack(pady=10)
 infXLabel_p = tk.Label(pFrame, text="Origin:", font=("Arial", 7, "bold"))
 xSelect_p = tk.Entry(pFrame, width=10)
 infYLabel_p = tk.Label(pFrame, text="Destiny:", font=("Arial", 7, "bold"))
 ySelect_p = tk.Entry(pFrame, width=10)
-pButton = tk.Button(pFrame, bg="lightblue", text="Find Shortest Path", command=AddPButtonClick)
+pButton = tk.Button(pFrame, bg="lightblue", text="Find Shortest Path", command=ShortPathButtonClick)
 infXLabel_p.pack(side="left", padx=2)
 xSelect_p.pack(side="left", padx=4)
 infYLabel_p.pack(side="left", padx=2)
@@ -322,11 +502,11 @@ pButton.pack(side="left", padx=5)
 
 # Grafic en pantalla
 imagenGrafico = Image.open("no_grafico.png")
-imagenGrafico = imagenGrafico.resize((500, 400))
+imagenGrafico = imagenGrafico.resize((image_size_x, image_size_y), Image.Resampling.LANCZOS)
 imagen_tk = ImageTk.PhotoImage(imagenGrafico)
-label_imagen = tk.Label(root, image=imagen_tk)
-label_imagen.pack(pady=20)
-label_imagen.pack()
+label_imagen = tk.Label(allFrame, image = imagen_tk, bd = 0)
+label_imagen.bind("<Button-1>", ImageClicked)
+label_imagen.pack(side="left", pady=20)
 
 # Executar finestra
 root.mainloop()

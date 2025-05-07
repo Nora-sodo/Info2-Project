@@ -1,7 +1,6 @@
 from Files.graph import Graph, AddSegment
 import matplotlib.pyplot as plt
 import graph
-from node import *
 from segment import *
 class Path:
     def __init__(self):
@@ -30,14 +29,17 @@ def CostToNode (p, orig):
         return -1
 
 
-def PlotPath (g, p):
+def PlotPath (p, size, show_all, ax):
     g_cami = Graph()
     i = 0
     for n in p.nodes:
-        plt.plot(n.x, n.y, 'o', color='red', markersize=5)
+        plt.plot(n.x, n.y, 'o', color='red', markersize=size*5)
         # Escriu el nom dels nodes a dalt a la dreta
-        plt.text(n.x + 0.5, n.y + 0.5, n.name, color='green', weight='bold', fontsize=6)
-        #g_cami.nodes.append(n)
+        if show_all:
+            plt.text(n.x + size * 0.5, n.y + size * 0.5, n.name, color='blue', weight='bold', fontsize=size * 8)
+        else:
+            plt.text(n.x + size * 0.1, n.y + size * 0.1, n.name, color='blue', weight='bold', fontsize=size * 17)
+
         graph.AddNode(g_cami, n)
         if i > 0:
             AddSegment(g_cami,"Segment", g_cami.nodes[i - 1].name, g_cami.nodes[i].name)
@@ -45,4 +47,7 @@ def PlotPath (g, p):
 
     # Dibuixa segments
     for s in g_cami.segments:
-        graph.CreateNiceArrows(s, 'green', 'green', 'green', 0.7, 0.5, 3)
+        if show_all:
+            graph.CreateNiceArrows(s, 'blue', 'blue', size*0.5, size*0.2, size*2, ax)
+        else:
+            graph.CreateNiceArrows(s, 'blue', 'blue', size * 0.2, size * 0.1, size * 2, ax)
