@@ -12,7 +12,7 @@ def NavPointsFromFile(filename):
             parts = line.strip()
             parts = parts.split()
             if line != "" and len(parts) == 4:
-                NavPoints.append(NavPoint(parts[0], parts[1], float(parts[2]), float(parts[3])))
+                NavPoints.append(NavPoint(parts[0]  , parts[1], float(parts[2]), float(parts[3])))
             else:
                 continue
     return NavPoints
