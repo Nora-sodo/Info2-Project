@@ -19,6 +19,14 @@ eurnav_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), "ECAC_nav
 eurseg_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), "ECAC_seg.txt")
 euraer_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), "ECAC_aer.txt")
 
+saved_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "saved_paths.txt")
+last_path= None
+with open(saved_path, "w") as f:
+    f.write('')
+rutasAlternativas = []  # Guardará rutas ya mostradas
+origenActual = None
+destinoActual = None
+
 #####################
 # VARIABLES GLOBALS #
 #####################
@@ -36,6 +44,9 @@ x_max = 0
 x_min = 0
 y_max = 0
 y_min = 0
+names = True
+cost = True
+density = False
 
 #####################
 # FUNCIONS PROPIES: #
@@ -47,9 +58,9 @@ def SeeSunkenOn_NoNew():
     ax = fig.add_subplot(111)
     GraphChange()
     if not nButton.cget('relief') == 'sunken':
-        Plot(windowGraph, activeNode, 'blue', ax, fig, densidad)
+        Plot(windowGraph, activeNode, 'blue', ax, fig, densidad, names, cost)
     else:
-        PlotNode(windowGraph, nodeSelect.get(), ax, fig, densidad)
+        PlotNode(windowGraph, nodeSelect.get(), ax, fig, densidad, names, cost)
     canvas.draw()
 
 # Per sempre que es crei grafic de zero, mira si esta enfonsat el boto de node map
@@ -64,13 +75,13 @@ def SeeSunkenOn_AllNew():
                 windowGraph.nodes[0].y + (y_max - y_min) / densidad**2 / 2)
     indexNode = 0
     if nButton.cget('relief') == 'sunken':
-        PlotNode(windowGraph, windowGraph.nodes[indexNode].name, ax, fig, densidad)
+        PlotNode(windowGraph, windowGraph.nodes[indexNode].name, ax, fig, densidad, names, cost)
     else:
         activeNode = windowGraph.nodes[indexNode]
-        Plot(windowGraph, activeNode, 'blue', ax, fig, densidad)
+        Plot(windowGraph, activeNode, 'blue', ax, fig, densidad, names, cost)
     canvas.draw()
 
-def PositionFixedButChange():
+def PositionFixedButChange(): # Neteja pantalla per si lunic que es canvia es alguna part del graph
     global ax, x_min, x_max, y_min, y_max
     x_min, x_max = ax.get_xlim()
     y_min, y_max = ax.get_ylim()
@@ -103,7 +114,9 @@ def GraphChange():
             y_max = n.y
 
     data_sp = fig.subplotpars
-    densidad = (len(windowGraph.nodes)/((x_max-x_min)*(y_max-y_min)*0.035))**(1/5)
+    densidad = (len(windowGraph.nodes) / ((x_max - x_min) * (y_max - y_min) * 0.035)) ** (1 / 5)
+    if densidad < 1:
+        densidad = 1
 
 # Passa de Airspace a Graph
 def AirspaceToGraph(g, a):
@@ -121,14 +134,19 @@ def AirspaceToGraph(g, a):
 
 # Aixeca botons i reinicia variables
 def Reset():
-    global cont_nodo, node1, node2
+    global cont_nodo, node1, node2, density
     if pButton.cget('relief') == 'sunken':
         pButton.config(relief="raised", bg="lightblue")
     if sButton.cget('relief') == 'sunken':
-        sButton.config(relief="raised", bg="lightblue")
+        sButton.config(relief="raised", bg="PaleGreen1")
     if nodeButton.cget('relief') == 'sunken':
-        nodeButton.config(relief="raised", bg="lightblue")
+        nodeButton.config(relief="raised", bg="PaleGreen1")
+    if delNodeButton.cget('relief') == 'sunken':
+        delNodeButton.config(relief="raised", bg="salmon")
+    if delSButton.cget('relief') == 'sunken':
+        delSButton.config(relief="raised", bg="salmon")
     cont_nodo = 0
+    density = False
     node1 = None
     node2 = None
 
@@ -303,21 +321,31 @@ def LoadButtonClick():
     SeeSunkenOn_AllNew()
     Reset()
 
+def BlankButtonClick():
+    global windowGraph, activeNode
+    windowGraph = Graph()
+    global activeNode, ax
+    fig.clf()
+    ax = fig.add_subplot(111)
+    GraphChange()
+    Reset()
+    canvas.draw()
+
 # Funcio per quan nButton pressionat
 def NPlotButtonClick():
     PositionFixedButChange()
     if nButton.cget('relief') == 'sunken':
         # Si está presionado, lo dejamos normal
-        Plot(windowGraph, activeNode, 'blue', ax, fig, densidad)
+        Plot(windowGraph, activeNode, 'blue', ax, fig, densidad, names, cost)
         nButton.config(relief="raised", bg="lightblue",text="Node Graph: OFF")
 
     else:
         # Si está normal, lo dejamos presionado
         if nodeSelect.get() == '':
-            PlotNode(windowGraph, activeNode.name,ax, fig, densidad)
+            PlotNode(windowGraph, activeNode.name,ax, fig, densidad, names, cost)
         else:
             try:
-                PlotNode(windowGraph, nodeSelect.get(), ax, fig, densidad)
+                PlotNode(windowGraph, nodeSelect.get(), ax, fig, densidad, names, cost)
             except Exception as e:
                 root = tk.Tk()
                 root.withdraw()
@@ -329,42 +357,68 @@ def NPlotButtonClick():
 # Boto per afegir node
 def AddNButtonClick():
     global cont_nodo, node1, node2, activeNode
-    sButton.config(relief="raised", bg="lightblue")
+    sButton.config(relief="raised", bg="PaleGreen1")
     pButton.config(relief="raised", bg="lightblue")
+    delNodeButton.config(relief="raised", bg="salmon")
+    delSButton.config(relief="raised", bg="salmon")
     if xSelect_n.get() == '' or ySelect_n.get() == '':
         if cont_nodo == 0:
             if nodeButton.cget('relief') == 'sunken':
-                nodeButton.config(relief="raised", bg="lightblue")
+                nodeButton.config(relief="raised", bg="PaleGreen1")
             else:
                 nodeButton.config(relief="sunken", bg="gray64")
             return False
         elif cont_nodo == 1 and nodeButton.cget('relief') == 'sunken':
             AddSegment(windowGraph, "Seg", node1.name, node2.name)
-            nodeButton.config(relief="raised", bg="lightblue")
+            nodeButton.config(relief="raised", bg="PaleGreen1")
             cont_nodo = 0
     else:
         node = Node(nameSelect_n.get(), float(xSelect_n.get()), float(ySelect_n.get()))
         AddNode(windowGraph, node)
         activeNode = node
     PositionFixedButChange()
-    Plot(windowGraph, activeNode, 'blue', ax, fig, densidad)
+    Plot(windowGraph, activeNode, 'blue', ax, fig, densidad, names, cost)
+    canvas.draw()
+
+# Boto per afegir node
+def DelNButtonClick():
+    global cont_nodo, node1, node2, activeNode
+    sButton.config(relief="raised", bg="PaleGreen1")
+    pButton.config(relief="raised", bg="lightblue")
+    nodeButton.config(relief="raised", bg="PaleGreen1")
+    delSButton.config(relief="raised", bg="salmon")
+    if cont_nodo == 0:
+        if delNodeButton.cget('relief') == 'sunken':
+            delNodeButton.config(relief="raised", bg="salmon")
+        else:
+            delNodeButton.config(relief="sunken", bg="gray64")
+        return False
+    elif cont_nodo == 1 and delNodeButton.cget('relief') == 'sunken':
+        AddSegment(windowGraph, "Seg", node1.name, node2.name)
+        delNodeButton.config(relief="raised", bg="salmon")
+        cont_nodo = 0
+
+    PositionFixedButChange()
+    Plot(windowGraph, activeNode, 'blue', ax, fig, densidad, names, cost)
     canvas.draw()
 
 # Boto per afegir segment
 def AddSButtonClick():
     global cont_nodo, node1, node2
     pButton.config(relief="raised", bg="lightblue")
-    nodeButton.config(relief="raised", bg="lightblue")
+    nodeButton.config(relief="raised", bg="PaleGreen1")
+    delNodeButton.config(relief="raised", bg="salmon")
+    delSButton.config(relief="raised", bg="salmon")
     if xSelect_s.get() == '' or ySelect_s.get() == '':
         if cont_nodo == 0:
             if sButton.cget('relief') == 'sunken':
-                sButton.config(relief="raised", bg="lightblue")
+                sButton.config(relief="raised", bg="PaleGreen1")
             else:
                 sButton.config(relief="sunken", bg="gray64")
             return False
         elif cont_nodo == 1 and sButton.cget('relief') == 'sunken':
             AddSegment(windowGraph, "Seg", node1.name, node2.name)
-            sButton.config(relief="raised", bg="lightblue")
+            sButton.config(relief="raised", bg="PaleGreen1")
             cont_nodo = 0
     else:
         try:
@@ -375,14 +429,54 @@ def AddSButtonClick():
             messagebox.showerror("Error", f"Non existing nodes")
             return None
     PositionFixedButChange()
-    Plot(windowGraph, activeNode, 'blue', ax, fig, densidad)
+    Plot(windowGraph, activeNode, 'blue', ax, fig, densidad, names, cost)
+    canvas.draw()
+
+# Boto per afegir segment
+def DelSButtonClick():
+    global cont_nodo, node1, node2
+
+    # Restaurar estado de los otros botones
+    sButton.config(relief="raised", bg="PaleGreen1")
+    pButton.config(relief="raised", bg="lightblue")
+    delNodeButton.config(relief="raised", bg="salmon")
+    nodeButton.config(relief="raised", bg="PaleGreen1")
+
+    # Modo selección por menú desplegable
+    if xSelect_s.get() and ySelect_s.get():
+        origin = xSelect_s.get()
+        destination = ySelect_s.get()
+        success = DelSegment(windowGraph, origin, destination)
+        if not success:
+            messagebox.showerror("Error", "Segment not found or nodes do not exist.")
+            return
+    # Modo selección por clics en nodos
+    elif cont_nodo == 1 and delSButton.cget('relief') == 'sunken':
+        success = DelSegment(windowGraph, node1.name, node2.name)
+        if not success:
+            messagebox.showerror("Error", "Segment not found between selected nodes.")
+            return
+        cont_nodo = 0
+    else:
+        # Activar/desactivar modo selección
+        if delSButton.cget('relief') == 'sunken':
+            delSButton.config(relief="raised", bg="salmon")
+        else:
+            delSButton.config(relief="sunken", bg="gray64")
+        return
+
+    # Actualizar visualización
+    delSButton.config(relief="raised", bg="salmon")
+    PositionFixedButChange()
+    Plot(windowGraph, activeNode, 'blue', ax, fig, densidad, names, cost)
     canvas.draw()
 
 # Boto per trobar cami mes curt
 def ShortPathButtonClick():
-    global cont_nodo
+    global cont_nodo, last_path, rutasAlternativas, origenActual, destinoActual
     sButton.config(relief="raised", bg="lightblue")
     nodeButton.config(relief="raised", bg="lightblue")
+    delNodeButton.config(relief="raised", bg="salmon")
     PositionFixedButChange()
     if xSelect_p.get() == '' or ySelect_p.get() == '':
         if cont_nodo == 0:
@@ -396,7 +490,13 @@ def ShortPathButtonClick():
             cont_nodo = 0
             pButton.config(relief="raised", bg="lightblue")
             try:
-                PlotPath(FindShortestPath(windowGraph, node1.name, node2.name), windowGraph, ax, densidad)
+                rutasAlternativas=[]
+                altPathButton.config(state="normal", text="Alternative Path")
+                origenActual = xSelect_p.get()
+                destinoActual = ySelect_p.get()
+                last_path = FindShortestPath(windowGraph, origenActual, destinoActual, rutasAlternativas)
+                rutasAlternativas.append(last_path)
+                PlotPath(last_path, windowGraph, ax, densidad)
             except Exception as e:
                 root = tk.Tk()
                 root.withdraw()
@@ -404,7 +504,14 @@ def ShortPathButtonClick():
                 return None
     else:
         try:
-            PlotPath(FindShortestPath(windowGraph, xSelect_p.get(), ySelect_p.get()), windowGraph, ax, densidad)
+            rutasAlternativas=[]
+            altPathButton.config(state="normal", text="Alternative Path")
+            origenActual = xSelect_p.get()
+            destinoActual = ySelect_p.get()
+            last_path = FindShortestPath(windowGraph, origenActual, destinoActual, rutasAlternativas)
+            rutasAlternativas.append(last_path)
+            PlotPath(last_path, windowGraph, ax, densidad)
+
         except Exception as e:
             root = tk.Tk()
             root.withdraw()
@@ -413,8 +520,43 @@ def ShortPathButtonClick():
     nButton.config(relief="raised", bg="lightblue", text="Node Graph: OFF")
     canvas.draw()
 
+def SavePath():
+    global last_path
+    if not last_path:
+        messagebox.showerror("Error", "No path to save!")
+        return
+
+    with open(saved_path, "a") as f:
+        f.write("Path:\n")
+        for n in last_path.nodes:
+            f.write(f"{n.name} ({n.x}, {n.y})\n")
+        f.write(f"Total distance: {round(last_path.cost, 2)}\n")
+        f.write("-----\n")
+
+    messagebox.showinfo("Saved", "Path saved.")
+
+def AlternativePathClick():
+    global rutasAlternativas, last_path, origenActual, destinoActual, altPathButton
+
+    if origenActual is None or destinoActual is None:
+        messagebox.showerror("Error", "Primero genera una ruta con 'Find Shortest Path'")
+        return
+
+    try:
+        nuevaRuta = FindShortestPath(windowGraph, origenActual, destinoActual, rutasAlternativas)
+    except Exception as e:
+        altPathButton.config(state="disabled", text="No more paths")
+        messagebox.showinfo("Info", "No hay más rutas alternativas.")
+        return
+
+    rutasAlternativas.append(nuevaRuta)
+    last_path = nuevaRuta
+    PositionFixedButChange()
+    PlotPath(last_path, windowGraph, ax, densidad)
+    canvas.draw()
+
 # Boto per guardar KML
-def KmlButton():
+def KmlButtonClick():
     """
     Genera un archivo KML con los puntos dados y opcionalmente una ruta que los conecta.
 
@@ -484,6 +626,56 @@ def KmlButton():
     else:
         print("Operación cancelada.")
 
+def DensityButtonClick():
+    global density
+    density = True
+    PositionFixedButChange()
+    fig.clf()
+    ax = fig.add_subplot(111)
+    GraphChange()
+    for n in windowGraph.nodes:
+        ax.plot(n.x, n.y, 'o', color='red', markersize=4 + 2*len(n.neighbors))
+        # Escriu el nom dels nodes a dalt a la dreta
+        if names:
+            ax.text(n.x + 0.1/densidad**2, n.y + 0.1/densidad**2, n.name, color='black', weight='bold', fontsize=6, clip_on=True)
+
+    # Dibuixa segments i mostra el que mesuren
+    for s in windowGraph.segments:
+        CreateNiceArrows(s, "blue", "blue", 0.5/densidad**3, 0.2/densidad**3, 1.5, ax)
+        if cost:
+            MidTextSegment(s, round(s.cost, 2), 8, 'black', ax)
+
+    ax.grid(color='red', linestyle='dashed', linewidth=0.5) # Dibuixa una graella pel fons
+    canvas.draw()
+
+def QNamesButtonClick():
+    global names
+    if names == True:
+        names = False
+        qNamesButton.config(relief="sunken", bg="gray64", text="Quit Names: ON")
+    else:
+        names = True
+        qNamesButton.config(relief="raised", bg="lightblue", text="Quit Names: OFF")
+    PositionFixedButChange()
+    if density == False:
+        SeeSunkenOn_NoNew()
+    else:
+        DensityButtonClick()
+
+def QCostButtonClick():
+    global cost
+    if cost == True:
+        cost = False
+        qCostButton.config(relief="sunken", bg="gray64", text="Quit Cost: ON")
+    else:
+        cost = True
+        qCostButton.config(relief="raised", bg="lightblue", text="Quit Cost: OFF")
+    PositionFixedButChange()
+    if density == False:
+        SeeSunkenOn_NoNew()
+    else:
+        DensityButtonClick()
+
 # Funcio que fara que aparegui en pantalla una pantalla per preguntar el nom del node
 def NameNodeWindow(x,y):
     # Crear finestra emergent
@@ -504,7 +696,7 @@ def NameNodeWindow(x,y):
         AddNode(windowGraph, node)
         activeNode = node
         PositionFixedButChange()
-        Plot(windowGraph, node, 'blue', ax, fig, densidad)
+        Plot(windowGraph, node, 'blue', ax, fig, densidad, names, cost)
         canvas.draw()
         text_window.destroy()  # Cerrar la ventana emergente
 
@@ -533,15 +725,16 @@ def KeyEvent(event):
     # Actualitzar pantalla
     if nButton.cget('relief') == 'sunken':
         if nodeSelect.get() == '' or FindNodeName(windowGraph, nodeSelect.get()) == None:
-            PlotNode(windowGraph, activeNode.name, ax, fig, densidad)
+            PlotNode(windowGraph, activeNode.name, ax, fig, densidad, names, cost)
         else:
-            PlotNode(windowGraph, nodeSelect.get(), ax, fig, densidad)
+            PlotNode(windowGraph, nodeSelect.get(), ax, fig, densidad, names, cost)
     else:
-        Plot(windowGraph, activeNode,'blue', ax, fig, densidad)
+        Plot(windowGraph, activeNode,'blue', ax, fig, densidad, names, cost)
     canvas.draw()
 
 # Funcio executada quan es clica al grafic
 def PlotClicked(event):
+    nodo_clickado = Node("",0,0)
     if toolbar.mode != 'pan/zoom' and toolbar.mode != 'zoom rect':
         global activeNode, ax, x_min,x_max,y_min,y_max, node1, node2, cont_nodo
         x_min, x_max = ax.get_xlim()
@@ -566,26 +759,34 @@ def PlotClicked(event):
                             node2 = n
                             if pButton.cget('relief') == 'sunken':
                                 ShortPathButtonClick()
-                            else:
+                            elif sButton.cget('relief') == 'sunken':
                                 AddSButtonClick()
+                            elif delSButton.cget('relief') == 'sunken':
+                                DelSButtonClick()
                     else:
                         activeNode = n
+                    nodo_clickado = n
                     hay_punto = True
                     break
-            if not hay_punto and densidad < 3 and nodeButton.cget('relief') == 'sunken':
+            if not hay_punto and nodeButton.cget('relief') == 'sunken':
                 NameNodeWindow(x_grafic,y_grafic)
-                nodeButton.config(relief="raised", bg="lightblue")
+                nodeButton.config(relief="raised", bg="PaleGreen1")
+            elif hay_punto and delNodeButton.cget('relief') == 'sunken':
+                DelNode(windowGraph,nodo_clickado)
+                activeNode = windowGraph.nodes[0]
+                SeeSunkenOn_NoNew()
+                canvas.draw()
 
-            if pButton.cget('relief') != 'sunken' and sButton.cget('relief') != 'sunken':
+            if pButton.cget('relief') != 'sunken' and sButton.cget('relief') != 'sunken' and delSButton.cget('relief') != 'sunken':
                 fig.clf()
                 ax = fig.add_subplot(111)
                 ax.set_xlim(x_min, x_max)
                 ax.set_ylim(y_min, y_max)
                 GraphChange()
                 if not nButton.cget('relief') == 'sunken':
-                    Plot(windowGraph, activeNode, 'blue', ax, fig, densidad)
+                    Plot(windowGraph, activeNode, 'blue', ax, fig, densidad, names, cost)
                 else:
-                    PlotNode(windowGraph, nodeSelect.get(), ax, fig, densidad)
+                    PlotNode(windowGraph, nodeSelect.get(), ax, fig, densidad, names, cost)
                 canvas.draw()
 
 # Per fer zoom
@@ -601,8 +802,6 @@ def OnScroll(event):
     ylim = ax.get_ylim()
     xdata = (ax.get_xlim()[0] + ax.get_xlim()[1]) / 2
     ydata = (ax.get_ylim()[0] + ax.get_ylim()[1]) / 2
-    """xdata = event.xdata
-    ydata = event.ydata"""
 
     new_width = (xlim[1] - xlim[0]) * scale_factor
     new_height = (ylim[1] - ylim[0]) * scale_factor
@@ -637,7 +836,7 @@ root.focus_set()
 
 # Configuración de layout principal
 root.columnconfigure(0, weight=1)   # 1/5 para botones
-root.columnconfigure(1, weight=4)   # 4/5 para canvas
+root.columnconfigure(1, weight=100)   # 4/5 para canvas
 root.rowconfigure(0, weight=1)      # Principal
 root.rowconfigure(1, weight=0)      # Toolbar
 
@@ -647,20 +846,35 @@ sidebar.grid(row=0, column=0, sticky="nsew")
 sidebar.grid_propagate(False)  # Evita que el contenido lo expanda
 
 # Título
-title = tk.Label(sidebar, text="Graph options:", font=("Arial", 10, "bold"))
+title = tk.Label(sidebar, text="Graph main options:", font=("Arial", 10, "bold"))
 title.pack(pady=(10, 5), fill="x")
 
-# Botones de selección de gráfico
-for text, command in [
+# Crear un sub-frame dentro del sidebar para el grid de botones
+button_grid = tk.Frame(sidebar)
+button_grid.pack(fill="both", expand=True, padx=10, pady=10)
+
+# Lista de botones
+buttons = [
     ("Example Graph", ExampleButtonClick),
     ("Invented Graph", InventedButtonClick),
     ("Catalonia Graph", CatButtonClick),
     ("Spain Graph", EspButtonClick),
     ("Europe Graph", EurButtonClick),
     ("Load File", LoadButtonClick),
-    ("Save KML", KmlButton)
-]:
-    tk.Button(sidebar, bg="lightblue", text=text, command=command).pack(fill="x", padx=10, pady=4)
+    ("Blank Graph", BlankButtonClick)
+]
+
+# Distribuir botones en 2 columnas dentro del sub-frame
+for index, (text, command) in enumerate(buttons):
+    row = index // 2
+    col = index % 2
+    tk.Button(
+        button_grid, bg="lightblue", text=text, command=command
+    ).grid(row=row, column=col, sticky="ew", padx=5, pady=4)
+
+# Hacer que las columnas del sub-frame se expandan igualmente
+button_grid.grid_columnconfigure(0, weight=1)
+button_grid.grid_columnconfigure(1, weight=1)
 
 # --- Crear Node ---
 nodeFrame = tk.Frame(sidebar)
@@ -675,8 +889,10 @@ tk.Label(nodeFrame, text="Y:", font=("Arial", 7, "bold")).pack(side="left", padx
 ySelect_n = tk.Entry(nodeFrame, width=10)
 ySelect_n.pack(side="left", padx=4)
 # Node Button
-nodeButton = tk.Button(sidebar, bg="lightblue", text="Create Node", command=AddNButtonClick)
+nodeButton = tk.Button(sidebar, bg="PaleGreen1", text="Create Node", command=AddNButtonClick)
 nodeButton.pack(fill="x", padx=10, pady=4)
+delNodeButton = tk.Button(sidebar, bg="salmon", text="Delete Node", command=DelNButtonClick)
+delNodeButton.pack(fill="x", padx=10, pady=4)
 
 # --- Crear Segment ---
 sFrame = tk.Frame(sidebar)
@@ -688,8 +904,10 @@ tk.Label(sFrame, text="Destiny:", font=("Arial", 7, "bold")).pack(side="left", p
 ySelect_s = tk.Entry(sFrame, width=10)
 ySelect_s.pack(side="left", padx=4)
 # Segment Button
-sButton = tk.Button(sidebar, bg="lightblue", text="Create Segment", command=AddSButtonClick)
+sButton = tk.Button(sidebar, bg="PaleGreen1", text="Create Segment", command=AddSButtonClick)
 sButton.pack(fill="x", padx=10, pady=4)
+delSButton = tk.Button(sidebar, bg="salmon", text="Delete Segment", command=DelSButtonClick)
+delSButton.pack(fill="x", padx=10, pady=4)
 
 # --- Shortest Path ---
 pFrame = tk.Frame(sidebar)
@@ -703,6 +921,9 @@ ySelect_p.pack(side="left", padx=4)
 # Path Button
 pButton = tk.Button(sidebar, bg="lightblue", text="Find Shortest Path", command=ShortPathButtonClick)
 pButton.pack(fill="x", padx=10, pady=4)
+altPathButton = tk.Button(sidebar, bg="pink", text="Alternative Path", command=AlternativePathClick)
+altPathButton.pack(fill="x", padx=10, pady=4)
+tk.Button(sidebar, bg="lightyellow", text="Save path to file", command=SavePath).pack(fill="x", padx=10, pady=4)
 
 # --- Node Graph Mode ---
 nFrame = tk.Frame(sidebar)
@@ -713,6 +934,23 @@ nodeSelect.pack(side="left", padx=5)
 # Node Mode Button
 nButton = tk.Button(sidebar, bg="lightblue", text="Node Graph: OFF", command=NPlotButtonClick)
 nButton.pack(fill="x", padx=10, pady=4)
+
+# Título Otros
+title = tk.Label(sidebar, text="Other options:", font=("Arial", 10, "bold"))
+title.pack(pady=(10, 5), fill="x")
+
+for text, command in [
+    ("Save KML", KmlButtonClick),
+    ("Density Graph", DensityButtonClick)
+]:
+    tk.Button(sidebar, bg="lightblue", text=text, command=command).pack(fill="x", padx=10, pady=4)
+
+qNamesButton = tk.Button(sidebar, bg="lightblue", text="Quit Names: OFF", command=QNamesButtonClick)
+qNamesButton.pack(fill="x", padx=10, pady=4)
+
+qCostButton = tk.Button(sidebar, bg="lightblue", text="Quit Cost: OFF", command=QCostButtonClick)
+qCostButton.pack(fill="x", padx=10, pady=4)
+
 
 # --- Canvas para el gráfico ---
 canvas = FigureCanvasTkAgg(fig, master=root)

@@ -18,6 +18,13 @@ def AddNode(g, n): # Afegeix un node a un Graph g
         g.nodes.append(n)
         return True
 
+def DelNode(g, n): # Afegeix un node a un Graph g
+    # Eliminar el nodo
+    g.nodes = [node for node in g.nodes if node.name != n.name]
+
+    # Eliminar los segmentos conectados al nodo
+    g.segments = [s for s in g.segments if s.origin_n != n and s.dest_n != n]
+
 def FindNodeName(g, name): # Troba a un Graph el node amb el nom indicat
     for n in g.nodes:
         if n.name == name:
@@ -45,6 +52,30 @@ def AddSegment(g, segmentName, nameOriginNode, nameDestinationNode): # Afegeix u
     else: # Si no ha trobat els dos retornara False
         return False
 
+def DelSegment(g, nameOriginNode, nameDestinationNode):  # Elimina un segment del Graph g
+    foundOrigin = False
+    originNode = g.nodes[0]
+    foundDestination = False
+    destinationNode = g.nodes[0]
+
+    # Buscar los nodos origen y destino por nombre
+    for n in g.nodes:
+        if n.name == nameOriginNode:
+            foundOrigin = True
+            originNode = n
+        elif n.name == nameDestinationNode:
+            foundDestination = True
+            destinationNode = n
+
+    if foundOrigin and foundDestination:
+        for s in g.segments:
+            if (s.origin_n == originNode and s.dest_n == destinationNode):
+                g.segments.remove(s)
+                return True
+        return False  # No se encontró el segmento exacto
+    else:
+        return False  # No se encontraron ambos nodos
+
 def AddDobleSegment(g, segmentName, n1, n2): # Afegeix un segment en doble direccio
     AddSegment(g, segmentName, n1, n2)
     AddSegment(g, segmentName, n2, n1)
@@ -59,7 +90,7 @@ def GetClosest(g, x, y): # Troba el node que pertany al Graph g mes proper al pu
             closest = n
     return closest
 
-def Plot(g, active_n, color, ax, fig, densidad):
+def Plot(g, active_n, color, ax, fig, densidad, names, cost):
     # Dibuixa els nodes
     for n in g.nodes:
         if n == active_n:
@@ -67,17 +98,18 @@ def Plot(g, active_n, color, ax, fig, densidad):
         else:
             ax.plot(n.x, n.y, 'o', color='red', markersize=5)
         # Escriu el nom dels nodes a dalt a la dreta
-        ax.text(n.x + 0.1/densidad**2, n.y + 0.1/densidad**2, n.name, color='black', weight='bold', fontsize=6, clip_on=True)
+        if names:
+            ax.text(n.x + 0.1/densidad**2, n.y + 0.1/densidad**2, n.name, color='black', weight='bold', fontsize=6, clip_on=True)
 
     # Dibuixa segments i mostra el que mesuren
     for s in g.segments:
         CreateNiceArrows(s, color, color, 0.5/densidad**3, 0.2/densidad**3, 1.5, ax)
-        if densidad < 3:
+        if cost:
             MidTextSegment(s, round(s.cost, 2), 8, 'black', ax)
 
     ax.grid(color='red', linestyle='dashed', linewidth=0.5) # Dibuixa una graella pel fons
 
-def PlotNode (g, nameOrigin, ax, fig, densidad):
+def PlotNode (g, nameOrigin, ax, fig, densidad, names, cost):
     node = next(n for n in g.nodes if n.name == nameOrigin) # Primer node que compleixi que el seu nom es igual a nameOrigin
     i = 1 # Comptador
     if node == None: # Si no s'ha trobat cap node la funcio acaba
@@ -92,12 +124,13 @@ def PlotNode (g, nameOrigin, ax, fig, densidad):
                 s = Segment('Unión vecina' + str(i), node, n)
                 i += 1
                 CreateNiceArrows(s, 'red', 'red', 0.5/densidad**3, 0.2/densidad**3, 1.5, ax)
-                if densidad < 3:
+                if cost:
                     MidTextSegment(s, round(s.cost, 2), 8,'black', ax)
             else:
                 ax.plot(n.x, n.y, 'o', color='grey', markersize=5) # Pinta els nodes no veins de gris
             # Escriu el nom del node
-            ax.text(n.x + 0.1/densidad**2, n.y + 0.1/densidad**2, n.name, color='green', weight='bold', fontsize=6, clip_on=True)
+            if names:
+                ax.text(n.x + 0.1/densidad**2, n.y + 0.1/densidad**2, n.name, color='green', weight='bold', fontsize=6, clip_on=True)
 
         ax.grid(color='blue', linestyle='dashed', linewidth=0.5)  # Dibuixa una graella pel fons
 
@@ -151,51 +184,50 @@ def GraphFile(filename):
 
     return g # Retorna el Graph
 
-def FindShortestPath (g, n_orig, n_dest):
+def FindShortestPath(g, n_orig, n_dest, rutas_descartadas=[]):
     orig = FindNodeName(g, n_orig)
     dest = FindNodeName(g, n_dest)
 
-    shortest_path = Path()
     short_paths = [Path()]
     AddNodeToPath(short_paths[0], orig)
     short_paths[0].cost = Distance(orig, dest)
-    actual_n = orig
 
-    cost_shortest = 0 # Guarda la distancia mes curta
-    path_index = 0 # Guarda el cami que es bifurcara
-    j = 1  # Comptador de possibles camins
+    visited_paths = []
 
-    while actual_n != dest:
-        for n in actual_n.neighbors:
-            short_paths.append(Path())
-            for past_n in short_paths[path_index].nodes: # Afegir nodes veins al cami
-                short_paths[j].nodes.append(past_n)
-            short_paths[j].nodes.append(n)
+    while short_paths:
+        # Ordenar por coste
+        short_paths.sort(key=lambda p: p.cost)
+        current_path = short_paths.pop(0)
+        current_node = current_path.nodes[-1]
 
-            k = 0 # Comptador per sumar camins
-            while k < len(short_paths[j].nodes)-1: # Sumatori de cost de camins
-                short_paths[j].cost += Distance(short_paths[j].nodes[k], short_paths[j].nodes[k+1])
-                k += 1
+        # Si ya se llegó al destino
+        if current_node == dest:
+            # Comprobamos si esta ruta ya está descartada
+            current_route_names = [n.name for n in current_path.nodes]
+            for descartada in rutas_descartadas:
+                if current_route_names == [n.name for n in descartada.nodes]:
+                    break  # Ya existe, saltamos
+            else:
+                return current_path  # Ruta nueva encontrada
 
-            short_paths[j].cost += Distance(short_paths[j].nodes[k], dest)
-            cost_shortest = short_paths[1].cost
-            if short_paths[j].cost < cost_shortest:
-                cost_shortest = short_paths[j].cost
-            j += 1
-        del short_paths[path_index]
-        j -= 1
+        # Expandir vecinos
+        for neighbor in current_node.neighbors:
+            if neighbor not in current_path.nodes:
+                new_path = Path()
+                new_path.nodes = current_path.nodes.copy()
+                new_path.nodes.append(neighbor)
 
-        i = 0
-        while i < len(short_paths):
-            if short_paths[i].cost <= cost_shortest:
-                actual_n = short_paths[i].nodes[-1]
-                cost_shortest = short_paths[i].cost
-                path_index = i
-                if dest == short_paths[i].nodes[-1]:
-                    shortest_path = short_paths[i]
-            i += 1
+                # Calcular coste real
+                cost = 0
+                for i in range(len(new_path.nodes) - 1):
+                    cost += Distance(new_path.nodes[i], new_path.nodes[i + 1])
+                cost += Distance(new_path.nodes[-1], dest)
+                new_path.cost = cost
 
-    return shortest_path
+                short_paths.append(new_path)
+
+    # Si no se encontró ninguna ruta nueva
+    raise Exception("Ruta ya mostrada")
 
 #####################
 # FUNCIONS PER PLOT #
