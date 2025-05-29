@@ -19,10 +19,10 @@ def AddNode(g, n): # Afegeix un node a un Graph g
         return True
 
 def DelNode(g, n): # Afegeix un node a un Graph g
-    # Eliminar el nodo
+    # eliminar node
     g.nodes = [node for node in g.nodes if node.name != n.name]
 
-    # Eliminar los segmentos conectados al nodo
+    # eliminar segments
     g.segments = [s for s in g.segments if s.origin_n != n and s.dest_n != n]
 
 def FindNodeName(g, name): # Troba a un Graph el node amb el nom indicat
@@ -58,7 +58,7 @@ def DelSegment(g, nameOriginNode, nameDestinationNode):  # Elimina un segment de
     foundDestination = False
     destinationNode = g.nodes[0]
 
-    # Buscar los nodos origen y destino por nombre
+    # busca nodes
     for n in g.nodes:
         if n.name == nameOriginNode:
             foundOrigin = True
@@ -72,9 +72,9 @@ def DelSegment(g, nameOriginNode, nameDestinationNode):  # Elimina un segment de
             if (s.origin_n == originNode and s.dest_n == destinationNode):
                 g.segments.remove(s)
                 return True
-        return False  # No se encontró el segmento exacto
+        return False  # si no es troba el segment exacte
     else:
-        return False  # No se encontraron ambos nodos
+        return False  # si no s'han trobat els dos nodes
 
 def AddDobleSegment(g, segmentName, n1, n2): # Afegeix un segment en doble direccio
     AddSegment(g, segmentName, n1, n2)
@@ -111,7 +111,7 @@ def Plot(g, active_n, color, ax, fig, densidad, names, cost):
 
 def PlotNode (g, nameOrigin, ax, fig, densidad, names, cost):
     node = next(n for n in g.nodes if n.name == nameOrigin) # Primer node que compleixi que el seu nom es igual a nameOrigin
-    i = 1 # Comptador
+    i = 1
     if node == None: # Si no s'ha trobat cap node la funcio acaba
         return False
     else: # Si s'ha trobat creara un segment entre els nodes veins del node i el node, a mes de dibuixar tots els nodes del Graph g
@@ -136,53 +136,79 @@ def PlotNode (g, nameOrigin, ax, fig, densidad, names, cost):
 
         return True
 
+import tkinter as tk
+from tkinter import messagebox
+
 def GraphFile(filename):
     # Hi haura un text que marqui Node,x,y i un altre Segment,Origin,Destination
     g = Graph() # Es crea un Graph g on es guardaran totes les dades
-    with open(filename, 'r') as file:
-        lines = file.readlines() # Llista amb les linies del fitxer
+    try:
+        with open(filename, 'r') as file:
+            lines = file.readlines() # Llista amb les linies del fitxer
+    except Exception:
+        root = tk.Tk()
+        root.withdraw()
+        messagebox.showerror("Error", "Could not open the file")
+        root.destroy()
+        return None
+
     reading_nodes = True # Variable que determinara si esta llegint els nodes (True) o els segments (False)
-    for line in lines:
-        line = line.strip() # Elimina espais inicials
+    try:
+        for line in lines:
+            line = line.strip() # Elimina espais inicials
 
-        # Mira en quin cas es troba: linia buida, node o segment
-        if not line:
-            continue
-        if line == "Segment, Origin, Destination:":
-            reading_nodes = False
-            continue
-        elif line == "Node, x, y:":
-            reading_nodes = True
-            continue
+            # Mira en quin cas es troba: linia buida, node o segment
+            if not line:
+                continue
+            if line == "Segment, Origin, Destination:":
+                reading_nodes = False
+                continue
+            elif line == "Node, x, y:":
+                reading_nodes = True
+                continue
 
-        parts = line.split(",") # Separa les paraules per la coma
+            parts = line.split(",") # Separa les paraules per la coma
 
-        if reading_nodes:
-            # NODES:
-            name = parts[0]
-            x = float(parts[1])
-            y = float(parts[2])
-            # Crea node i l'afegeix a g
-            node = Node(name, x, y)
-            g.nodes.append(node)
-        else:
-            # SEGMENTS:
-            seg_name = parts[0]
-            origin_name = parts[1]
-            dest_name = parts[2]
+            if reading_nodes:
+                # NODES:
+                if len(parts) != 3:
+                    raise ValueError("Wrong node format")
+                name = parts[0]
+                x = float(parts[1])
+                y = float(parts[2])
+                # Crea node i l'afegeix a g
+                node = Node(name, x, y)
+                g.nodes.append(node)
+            else:
+                # SEGMENTS:
+                if len(parts) != 3:
+                    raise ValueError("Wrong segment format")
+                seg_name = parts[0]
+                origin_name = parts[1]
+                dest_name = parts[2]
 
-            # Busca quin node te de nom el esmentat en el fitxer (tant d'origen com de desti)
-            origin_node = next(n for n in g.nodes if n.name == origin_name)
-            dest_node = next(n for n in g.nodes if n.name == dest_name)
+                # Busca quin node te de nom el esmentat en el fitxer (tant d'origen com de desti)
+                origin_node = next((n for n in g.nodes if n.name == origin_name), None)
+                dest_node = next((n for n in g.nodes if n.name == dest_name), None)
+                if origin_node is None or dest_node is None:
+                    raise ValueError("origin or destiny node not found")
 
-            # Crea segment i l'afegeix a g
-            segment = Segment(seg_name, origin_node, dest_node)
-            g.segments.append(segment)
+                # Crea segment i l'afegeix a g
+                segment = Segment(seg_name, origin_node, dest_node)
+                g.segments.append(segment)
 
-            # Afegeix el node desti com a vei del node origen
-            origin_node.neighbors.append(dest_node)
+                # Afegeix el node desti com a vei del node origen
+                origin_node.neighbors.append(dest_node)
 
-    return g # Retorna el Graph
+        return g # Retorna el Graph
+
+    except Exception:
+        root = tk.Tk()
+        root.withdraw()
+        messagebox.showerror("Error", "Wrong file format")
+        root.destroy()
+        return None
+
 
 def FindShortestPath(g, n_orig, n_dest, rutas_descartadas=[]):
     orig = FindNodeName(g, n_orig)
@@ -195,29 +221,29 @@ def FindShortestPath(g, n_orig, n_dest, rutas_descartadas=[]):
     visited_paths = []
 
     while short_paths:
-        # Ordenar por coste
+        # ordena pel cost
         short_paths.sort(key=lambda p: p.cost)
         current_path = short_paths.pop(0)
         current_node = current_path.nodes[-1]
 
-        # Si ya se llegó al destino
+        # Si ja s'ha arribat
         if current_node == dest:
-            # Comprobamos si esta ruta ya está descartada
+            # es mira si la ruta ja esta descartada
             current_route_names = [n.name for n in current_path.nodes]
             for descartada in rutas_descartadas:
                 if current_route_names == [n.name for n in descartada.nodes]:
-                    break  # Ya existe, saltamos
+                    break
             else:
-                return current_path  # Ruta nueva encontrada
+                return current_path  # Ruta nova
 
-        # Expandir vecinos
+        # s'expandeixen neighbors
         for neighbor in current_node.neighbors:
             if neighbor not in current_path.nodes:
                 new_path = Path()
                 new_path.nodes = current_path.nodes.copy()
                 new_path.nodes.append(neighbor)
 
-                # Calcular coste real
+                # Calcular cost
                 cost = 0
                 for i in range(len(new_path.nodes) - 1):
                     cost += Distance(new_path.nodes[i], new_path.nodes[i + 1])
@@ -226,8 +252,8 @@ def FindShortestPath(g, n_orig, n_dest, rutas_descartadas=[]):
 
                 short_paths.append(new_path)
 
-    # Si no se encontró ninguna ruta nueva
-    raise Exception("Ruta ya mostrada")
+    # Si no es troba ruta nova
+    raise Exception("Path already shown")
 
 #####################
 # FUNCIONS PER PLOT #
